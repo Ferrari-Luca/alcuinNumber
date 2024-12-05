@@ -2,11 +2,26 @@ import networkx as nx
 
 # Q2
 from pysat.solvers import Minicard
-from pysat.formula import CNFPlus, IDPool
+from pysat.formula import CNFPlus, IDPool, CNF
+
+import networkx as nx
+from itertools import combinations
+
+
 
 def gen_solution(G: nx.Graph, k: int) -> list[tuple[int, set, set]]:
-    from pysat.card import CardEnc, EncType
+    """
+    Génère une solution pour le graphe G avec une capacité de bateau k,
+    en traduisant les contraintes de cardinalité directement en clauses FNC.
 
+    Paramètres:
+    - G: Graphe non orienté (networkx.Graph)
+    - k: Capacité maximale du bateau (entier)
+
+    Retourne:
+    - Une liste de triplets (berger_side, S0_t, S1_t) pour chaque instant t,
+      ou None si aucune solution n'est trouvée.
+    """
     # Initialize the variable ID pool
     vpool = IDPool()
 
@@ -19,7 +34,7 @@ def gen_solution(G: nx.Graph, k: int) -> list[tuple[int, set, set]]:
     T = 2 * n + 1
 
     # Initialize the CNF formula
-    cnf = CNFPlus()
+    cnf = CNF()
 
     # Variables:
     # L_s_t: Subject s is on shore 0 at time t
@@ -66,9 +81,7 @@ def gen_solution(G: nx.Graph, k: int) -> list[tuple[int, set, set]]:
     for s in subjects:
         for t in range(T):
             # M_{s,t} <-> (L_{s,t} XOR L_{s,t+1})
-            # This can be encoded as:
-            # (M_{s,t} -> (L_{s,t} XOR L_{s,t+1}))
-            # ((L_{s,t} XOR L_{s,t+1}) -> M_{s,t})
+            # Encoding XOR:
             cnf.extend([
                 [-M[s][t], L[s][t], L[s][t+1]],
                 [-M[s][t], -L[s][t], -L[s][t+1]],
@@ -88,9 +101,10 @@ def gen_solution(G: nx.Graph, k: int) -> list[tuple[int, set, set]]:
     for t in range(T):
         m_vars = [M[s][t] for s in subjects]
         if len(m_vars) > k:
-            # Generate cardinality constraint: At most k variables can be true
-            at_most_k = CardEnc.atmost(lits=m_vars, bound=k, vpool=vpool, encoding=EncType.pairwise)
-            cnf.extend(at_most_k.clauses)
+            # Generate all combinations of k+1 variables
+            for combo in combinations(m_vars, k + 1):
+                # Add clause: At least one of these variables is False
+                cnf.append([-var for var in combo])
 
     # Conflict constraints
     # At each time t, no conflicting subjects are left alone without the berger
@@ -131,6 +145,7 @@ def gen_solution(G: nx.Graph, k: int) -> list[tuple[int, set, set]]:
     else:
         solver.delete()
         return None
+
 
 
 # Q3
@@ -180,8 +195,6 @@ def gen_solution_cvalid(G: nx.Graph, k: int, c: int) -> list[tuple[int, set, set
       - compartments_t: Tuple of sets, each set contains subjects in a compartment during the move.
     - Returns None if no solution is found.
     """
-    from pysat.card import CardEnc, EncType
-
     # Initialize the variable ID pool
     vpool = IDPool()
 
@@ -194,7 +207,7 @@ def gen_solution_cvalid(G: nx.Graph, k: int, c: int) -> list[tuple[int, set, set
     T = 2 * n + 1
 
     # Initialize the CNF formula
-    cnf = CNFPlus()
+    cnf = CNF()
 
     # Variables:
     # L_s_t: Subject s is on shore 0 at time t
@@ -248,8 +261,6 @@ def gen_solution_cvalid(G: nx.Graph, k: int, c: int) -> list[tuple[int, set, set
         for t in range(T):
             # M_{s,t} <-> (L_{s,t} XOR L_{s,t+1})
             # Encode XOR as:
-            # (M_{s,t} -> (L_{s,t} != L_{s,t+1}))
-            # ((L_{s,t} != L_{s,t+1}) -> M_{s,t})
             cnf.extend([
                 [-M[s][t], L[s][t], L[s][t+1]],
                 [-M[s][t], -L[s][t], -L[s][t+1]],
@@ -267,9 +278,9 @@ def gen_solution_cvalid(G: nx.Graph, k: int, c: int) -> list[tuple[int, set, set
             # Compartment Assignment Constraints
             # If M_{s,t} is true, then s must be assigned to exactly one compartment
             # M_{s,t} -> (C_{s,t,1} or ... or C_{s,t,c})
-            cnf.extend([[-M[s][t]] + [C[s][t][d] for d in range(1, c + 1)]])
+            cnf.append([-M[s][t]] + [C[s][t][d] for d in range(1, c + 1)])
 
-            # For uniqueness: For each pair of compartments, s cannot be in both
+            # For uniqueness: s cannot be assigned to more than one compartment
             for d1 in range(1, c + 1):
                 for d2 in range(d1 + 1, c + 1):
                     cnf.append([-C[s][t][d1], -C[s][t][d2]])
@@ -283,9 +294,10 @@ def gen_solution_cvalid(G: nx.Graph, k: int, c: int) -> list[tuple[int, set, set
     for t in range(T):
         m_vars = [M[s][t] for s in subjects]
         if len(m_vars) > k:
-            # Generate cardinality constraint: At most k variables can be true
-            at_most_k = CardEnc.atmost(lits=m_vars, bound=k, vpool=vpool, encoding=EncType.pairwise)
-            cnf.extend(at_most_k.clauses)
+            # Generate all combinations of k+1 variables
+            for combo in combinations(m_vars, k + 1):
+                # Add clause: At least one of these variables is False
+                cnf.append([-var for var in combo])
 
     # Conflict constraints
     # At each time t, no conflicting subjects are left alone on a shore without the berger
@@ -305,7 +317,6 @@ def gen_solution_cvalid(G: nx.Graph, k: int, c: int) -> list[tuple[int, set, set
     for t in range(T):
         for (i, j) in E:
             for d in range(1, c + 1):
-                # If i and j are both moving and assigned to compartment d, they cannot both be in compartment d
                 cnf.append([
                     -M[i][t], -M[j][t], -C[i][t][d], -C[j][t][d]
                 ])
@@ -319,14 +330,12 @@ def gen_solution_cvalid(G: nx.Graph, k: int, c: int) -> list[tuple[int, set, set
         # Extract the solution
         result = []
         for t in range(T + 1):
-            b_t = B[t]
-            berger_on_shore_0 = (b_t in model)
+            berger_on_shore_0 = (B[t] in model)
 
             S0_t = set()
             S1_t = set()
             for s in subjects:
-                l_s_t = L[s][t]
-                if l_s_t in model:
+                if L[s][t] in model:
                     S0_t.add(s)
                 else:
                     S1_t.add(s)
@@ -334,7 +343,6 @@ def gen_solution_cvalid(G: nx.Graph, k: int, c: int) -> list[tuple[int, set, set
             berger_side = 0 if berger_on_shore_0 else 1
 
             # For t in [0, T), extract compartments during movement
-            compartments = tuple()
             if t < T:
                 compartments_t = [set() for _ in range(c)]
                 for s in subjects:
@@ -356,6 +364,35 @@ def gen_solution_cvalid(G: nx.Graph, k: int, c: int) -> list[tuple[int, set, set
 
 # Q6
 def find_c_alcuin_number(G: nx.Graph, c: int) -> int:
-    # À COMPLÉTER
-    return
+    """
+    Compute the Alcuin_c(G) number for the given graph G and number of compartments c.
+
+    Parameters:
+    - G: A networkx.Graph representing the problem graph.
+    - c: An integer representing the number of compartments in the boat.
+
+    Returns:
+    - The minimal integer k such that a c-valid solution exists (i.e., Alcuin_c(G) = k).
+      Returns None if no solution exists.
+    """
+    n = len(G.nodes())
+    # The maximum possible k is n (number of subjects)
+    left = 1
+    right = n
+    alcuin_c_number = None
+
+    # We'll perform a binary search to find the minimal k
+    while left <= right:
+        mid = (left + right) // 2
+        solution = gen_solution_cvalid(G, mid, c)
+        if solution is not None:
+            # If a solution exists with k = mid, try to find a smaller k
+            alcuin_c_number = mid
+            right = mid - 1
+        else:
+            # No solution exists with k = mid, try a larger k
+            left = mid + 1
+
+    return alcuin_c_number
+
 

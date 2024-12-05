@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "alcuinnumber"
+version = "0.1.0"
+description = ""
+authors = ["lucaferrari <luca.ferrari222002@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.11"
+networkx = "^3.4.2"
+pysat = "^3.2.1"
+python-sat = "^1.8.dev13"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
