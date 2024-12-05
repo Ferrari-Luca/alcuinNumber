@@ -1,61 +1,39 @@
 from project import*
 
-if __name__ == "__main__":
-    # Simple example
-
-    # Define the graph G (e.g., the goat, wolf, and cabbage problem)
+# Exemple de graphe (Le graphe G est un graphe "chevre-loup-salade")
+def create_example_graph():
+    """
+    Crée un graphe où :
+    - 1 est la chèvre
+    - 2 est le loup
+    - 3 est la salade
+    Les conflits sont : chèvre-loup et chèvre-salade
+    """
     G = nx.Graph()
-    G.add_edges_from([
-        ('goat', 'wolf'),
-        ('goat', 'cabbage')
-    ])
+    G.add_nodes_from([1, 2, 3])  # 1: Chèvre, 2: Loup, 3: Salade
+    G.add_edges_from([(1, 2), (1, 3)])  # Conflits
+    return G
 
-    # Call the gen_solution function
-    k = 2  # Boat capacity
+
+def main():
+    # Création du graphe sans le berger
+    G = create_example_graph()
+
+    # Capacité du bateau (nombre maximum d'entités transportables)
+    k = 1
+
+    # Calcul de la solution
     solution = gen_solution(G, k)
 
+    # Affichage du résultat
     if solution is not None:
-        for t, (berger_side, S0_t, S1_t) in enumerate(solution):
-            print(f"Time {t}:")
-            print(f"  Berger is on shore {berger_side}")
-            print(f"  Shore 0: {S0_t}")
-            print(f"  Shore 1: {S1_t}")
+        print("Solution trouvée :")
+        for step, (berger_side, S0, S1) in enumerate(solution):
+            print(f"Étape {step}: Berger sur rive {berger_side}, Rive 0: {S0}, Rive 1: {S1}")
     else:
-        print("No solution found.")
+        print("Aucune solution trouvée.")
 
-    #test nombre d'Alcuin
-    G = nx.Graph()
-    G.add_edges_from([
-        ('chèvre', 'loup'),
-        ('chèvre', 'chou')
-    ])
+if __name__ == "__main__":
+    main()
 
-    # Calcul du nombre d'Alcuin
-    alcuin_number = find_alcuin_number(G)
-    print(f"Le nombre d'Alcuin du graphe est : {alcuin_number}")
-
-    # Define the graph G (e.g., the goat, wolf, and cabbage problem)
-    G = nx.Graph()
-    G.add_edges_from([
-        ('goat', 'wolf'),
-        ('goat', 'cabbage')
-    ])
-
-    # Call the gen_solution_cvalid function
-    k = 2  # Boat capacity
-    c = 2  # Number of compartments
-    solution = gen_solution_cvalid(G, k, c)
-
-    if solution is not None:
-        for t, (berger_side, S0_t, S1_t, compartments_t) in enumerate(solution):
-            print(f"Time {t}:")
-            print(f"  Berger is on shore {berger_side}")
-            print(f"  Shore 0: {S0_t}")
-            print(f"  Shore 1: {S1_t}")
-            if t < len(solution) - 1:
-                print(f"  Compartments during move:")
-                for idx, compartment in enumerate(compartments_t):
-                    print(f"    Compartment {idx + 1}: {compartment}")
-    else:
-        print("No solution found.")
 

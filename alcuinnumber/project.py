@@ -128,18 +128,14 @@ def gen_solution(G: nx.Graph, k: int) -> list[tuple[int, set, set]]:
         # Extract the solution
         result = []
         for t in range(T + 1):
-            b_t = B[t]
-            berger_on_shore_0 = (b_t in model)
+            # Accéder directement au côté du berger
+            berger_side = 0 if model[B[t] - 1] > 0 else 1
 
-            S0_t = set()
-            S1_t = set()
-            for s in subjects:
-                l_s_t = L[s][t]
-                if l_s_t in model:
-                    S0_t.add(s)
-                else:
-                    S1_t.add(s)
-            berger_side = 0 if berger_on_shore_0 else 1
+            # Extraire les sujets sur chaque rive
+            S0_t = {s for s in subjects if model[L[s][t] - 1] > 0}
+            S1_t = set(subjects) - S0_t
+
+            # Ajouter l'étape à la solution
             result.append((berger_side, S0_t, S1_t))
         return result
     else:
