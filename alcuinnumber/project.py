@@ -283,7 +283,7 @@ def gen_solution_cvalid(G: nx.Graph, k: int, c: int) -> list[tuple[int, set, set
 
             # If M_{s,t} is false, then C_{s,t,d} must be false for all d
             for d in range(1, c + 1):
-                cnf.append([-M[s][t], -C[s][t][d]])
+                cnf.append([M[s][t], -C[s][t][d]])
 
     # Boat capacity constraints
     # At each time t, sum of M_{s,t} <= k
@@ -339,13 +339,14 @@ def gen_solution_cvalid(G: nx.Graph, k: int, c: int) -> list[tuple[int, set, set
             berger_side = 0 if berger_on_shore_0 else 1
 
             # For t in [0, T), extract compartments during movement
-            if t < T:
+            if t > 0:
                 compartments_t = [set() for _ in range(c)]
                 for s in subjects:
-                    if M[s][t] in model:
-                        # Subject s is moving at time t
+                    # Les déplacements qui ont mené à l'instant t sont encodés à l'instant t-1
+                    if M[s][t - 1] in model:
+                        # Le sujet s s'est déplacé entre t-1 et t
                         for d in range(1, c + 1):
-                            if C[s][t][d] in model:
+                            if C[s][t - 1][d] in model:
                                 compartments_t[d - 1].add(s)
                                 break
                 compartments = tuple(compartments_t)
@@ -365,30 +366,33 @@ def find_c_alcuin_number(G: nx.Graph, c: int) -> int:
 
     Parameters:
     - G: A networkx.Graph representing the problem graph.
-    - c: An integer representing the number of compartments in the boat.
+    - c: Un entier représentant le nombre de compartiments dans le bateau.
 
     Returns:
-    - The minimal integer k such that a c-valid solution exists (i.e., Alcuin_c(G) = k).
-      Returns None if no solution exists.
+    - Le plus petit entier k tel qu'une séquence c-valide existe (c'est-à-dire Alcuin_c(G) = k).
+      Retourne INFINITY si aucune solution n'existe.
     """
     n = len(G.nodes())
-    # The maximum possible k is n (number of subjects)
+    # Le k maximal possible est n (le nombre de sujets)
     left = 1
     right = n
     alcuin_c_number = None
 
-    # We'll perform a binary search to find the minimal k
+    # Recherche binaire
     while left <= right:
         mid = (left + right) // 2
         solution = gen_solution_cvalid(G, mid, c)
         if solution is not None:
-            # If a solution exists with k = mid, try to find a smaller k
             alcuin_c_number = mid
             right = mid - 1
         else:
-            # No solution exists with k = mid, try a larger k
             left = mid + 1
 
-    return alcuin_c_number
+    # Si aucune solution n'a été trouvée, renvoyer INFINITY
+    if alcuin_c_number is None:
+        return float('inf')
+    else:
+        return alcuin_c_number
+
 
 
