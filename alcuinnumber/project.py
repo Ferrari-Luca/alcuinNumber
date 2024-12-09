@@ -11,16 +11,16 @@ from itertools import combinations
 
 def gen_solution(G: nx.Graph, k: int) -> list[tuple[int, set, set]]:
     """
-    Génère une solution pour le graphe G avec une capacité de bateau k,
-    en traduisant les contraintes de cardinalité directement en clauses FNC.
+        Generates a solution for the graph G with a boat capacity of k,
+        by translating cardinality constraints directly into CNF clauses.
 
-    Paramètres:
-    - G: Graphe non orienté (networkx.Graph)
-    - k: Capacité maximale du bateau (entier)
+        Parameters:
+        - G: An undirected graph (networkx.Graph)
+        - k: Maximum boat capacity (integer)
 
-    Retourne:
-    - Une liste de triplets (berger_side, S0_t, S1_t) pour chaque instant t,
-      ou None si aucune solution n'est trouvée.
+        Returns:
+        - A list of triplets (berger_side, S0_t, S1_t) for each time step t,
+        or None if no solution is found.
     """
     # Initialize the variable ID pool
     vpool = IDPool()
@@ -120,56 +120,65 @@ def gen_solution(G: nx.Graph, k: int) -> list[tuple[int, set, set]]:
             ])
 
     # Solve the CNF formula
-    solver = Minicard(bootstrap_with=cnf.clauses)
-    if solver.solve():
-        model = solver.get_model()
-        solver.delete()
+    solver = Minicard(bootstrap_with=cnf.clauses)  # Initialize the SAT solver with the CNF clauses
+    if solver.solve():  # Check if a satisfiable solution exists
+        model = solver.get_model()  # Retrieve a satisfying model if found
+        solver.delete()  # Release solver resources
 
         # Extract the solution
         result = []
-        for t in range(T + 1):
-            # Accéder directement au côté du berger
+        for t in range(T + 1):  # Iterate over all time steps
+            # Directly access the berger's side
+            # If the literal corresponding to the berger at time t is positive in the model,
+            # the berger is on side 0; otherwise, on side 1
             berger_side = 0 if model[B[t] - 1] > 0 else 1
 
-            # Extraire les sujets sur chaque rive
+            # Extract the subjects on each shore
+            # S0_t: Set of subjects on shore 0 at time t
             S0_t = {s for s in subjects if model[L[s][t] - 1] > 0}
+            # S1_t: Set of subjects on shore 1, which is the complement of S0_t
             S1_t = set(subjects) - S0_t
 
-            # Ajouter l'étape à la solution
+            # Append the current step to the result
             result.append((berger_side, S0_t, S1_t))
-        return result
+        return result  # Return the full solution
     else:
-        solver.delete()
-        return None
+        solver.delete()  # Release solver resources if no solution is found
+        return None  # Return None if no solution exists
+
 
 
 
 # Q3
 def find_alcuin_number(G: nx.Graph) -> int:
     """
-    Calcule le nombre d'Alcuin du graphe G en utilisant la fonction gen_solution
-    avec une recherche dichotomique
+    Computes the Alcuin number of the given graph G using a binary search approach.
 
-    Paramètres:
-    - G: un graphe non orienté (objet networkx.Graph)
+    Parameters:
+    - G: An undirected graph (networkx.Graph).
 
-    Retourne:
-    - Le nombre d'Alcuin de G (un entier)
+    Returns:
+    - The Alcuin number of G (an integer).
     """
     n = len(G.nodes)
-    left = 1
-    right = n
+    left = 1  # Minimum possible value for the Alcuin number.
+    right = n  # Maximum possible value for the Alcuin number (all nodes move one by one).
     alcuin_number = None
 
+    # Perform a binary search to determine the smallest k such that a valid solution exists
     while left <= right:
-        mid = (left + right) // 2
-        solution = gen_solution(G, mid)
+        mid = (left + right) // 2  # Test the middle value
+        solution = gen_solution(G, mid)  # Check if a valid solution exists for k = mid
         if solution is not None:
+            # If a solution exists for k, it might be the Alcuin number or smaller
             alcuin_number = mid
-            right = mid - 1
+            right = mid - 1  # Search in the lower half
         else:
+            # If no solution exists for k, search in the upper half
             left = mid + 1
+
     return alcuin_number
+
 
 
 
@@ -342,9 +351,9 @@ def gen_solution_cvalid(G: nx.Graph, k: int, c: int) -> list[tuple[int, set, set
             if t > 0:
                 compartments_t = [set() for _ in range(c)]
                 for s in subjects:
-                    # Les déplacements qui ont mené à l'instant t sont encodés à l'instant t-1
+                    # The movements leading to time t are encoded at time t-1
                     if M[s][t - 1] in model:
-                        # Le sujet s s'est déplacé entre t-1 et t
+                        # The subject s moved between t-1 and t
                         for d in range(1, c + 1):
                             if C[s][t - 1][d] in model:
                                 compartments_t[d - 1].add(s)
@@ -366,29 +375,29 @@ def find_c_alcuin_number(G: nx.Graph, c: int) -> int:
 
     Parameters:
     - G: A networkx.Graph representing the problem graph.
-    - c: Un entier représentant le nombre de compartiments dans le bateau.
+    - c: An integer representing the number of compartments in the boat.
 
     Returns:
-    - Le plus petit entier k tel qu'une séquence c-valide existe (c'est-à-dire Alcuin_c(G) = k).
-      Retourne INFINITY si aucune solution n'existe.
+    - The smallest integer k such that a c-valid sequence exists (i.e., Alcuin_c(G) = k).
+      Returns INFINITY if no solution exists.
     """
     n = len(G.nodes())
-    # Le k maximal possible est n (le nombre de sujets)
+    # The maximum possible value for k is n (the number of subjects)
     left = 1
     right = n
     alcuin_c_number = None
 
-    # Recherche binaire
+    # Binary search
     while left <= right:
         mid = (left + right) // 2
         solution = gen_solution_cvalid(G, mid, c)
         if solution is not None:
             alcuin_c_number = mid
-            right = mid - 1
+            right = mid - 1  # Try smaller values of k
         else:
-            left = mid + 1
+            left = mid + 1  # Increase k to find a valid solution
 
-    # Si aucune solution n'a été trouvée, renvoyer INFINITY
+    # If no solution was found, return INFINITY
     if alcuin_c_number is None:
         return float('inf')
     else:
